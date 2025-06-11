@@ -112,8 +112,8 @@ async def start_pm(client, message: Message, _):
     heart_markdown = f"<a href='{heart_img}'>♡︎</a>"
 
     start_text = (
-    f"<b>ʜᴇʟʟᴏ,</b> {message.from_user.mention} {heart_markdown}.\n"
-    f"<b>ʏᴏᴜ’ʀᴇ ɴᴏᴡ ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴛᴏ</b> {app.mention}\n\n"
+    f"<b>ʜᴇʟʟᴏ,</b> {message.from_user.mention} {heart_markdown}.\n\n"
+    f"<b>ʏᴏᴜ’ʀᴇ ɴᴏᴡ ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴛᴏ</b> {app.mention}\n"
     "<blockquote>⟶ ᴀ sʟᴇᴇᴋ ᴍᴜsɪᴄ ʙᴏᴛ ᴄʀᴀғᴛᴇᴅ ғᴏʀ sᴛʀᴇᴀᴍɪɴɢ ᴡɪᴛʜ sᴛʏʟᴇ, sᴘᴇᴇᴅ & ᴘᴏᴡᴇʀ.</blockquote>\n"
     "<b>ᴘʟᴀᴛғᴏʀᴍs :</b> ʏᴏᴜᴛᴜʙᴇ • sᴘᴏᴛɪғʏ • ᴀᴘᴘʟᴇ • sᴏᴜɴᴅᴄʟᴏᴜᴅ • ʀᴇssᴏ\n"
     "<b>ᴛᴀᴘ 'ʜᴇʟᴘ' ғᴏʀ ᴄᴏᴍᴍᴀɴᴅs & ᴍᴏᴅᴜʟᴇs.</b>"
