@@ -97,11 +97,11 @@ async def start_pm(client, message: Message, _):
     loading_msg = await message.reply_text("❄️")
     await asyncio.sleep(0.75)
     await loading_msg.edit_text("<blockquote>ʏᴏsɪᴋᴀ ɪs ɢᴇᴀʀɪɴɢ ᴜᴘ.</blockquote>")
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.24)
     await loading_msg.edit_text("<blockquote>ʏᴏsɪᴋᴀ ɪs ɢᴇᴀʀɪɴɢ ᴜᴘ..</blockquote>")
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.34)
     await loading_msg.edit_text("<blockquote>ʏᴏsɪᴋᴀ ɪs ɢᴇᴀʀɪɴɢ ᴜᴘ...</blockquote>")
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.22)
 
     out = private_panel(_)
     await loading_msg.edit_text(
