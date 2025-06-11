@@ -1,5 +1,6 @@
 import asyncio
 import time
+import random
 
 from pyrogram import filters
 from pyrogram.enums import ChatType
@@ -21,8 +22,18 @@ from AnonXMusic.utils.database import (
 from AnonXMusic.utils.decorators.language import LanguageStart
 from AnonXMusic.utils.formatters import get_readable_time
 from AnonXMusic.utils.inline import help_pannel, private_panel, start_panel
-from config import BANNED_USERS
 from strings import get_string
+
+from config import BANNED_USERS
+
+# Heart image markdown replacements
+HEART_IMAGES = [
+    "https://files.catbox.moe/r81508.png",
+    "https://files.catbox.moe/qxazvt.png",
+    "https://files.catbox.moe/wjw7h3.png",
+    "https://files.catbox.moe/3hexyx.png",
+    "https://files.catbox.moe/9pypu3.png",
+]
 
 
 @app.on_message(filters.command(["start"]) & filters.private & ~BANNED_USERS)
@@ -35,29 +46,25 @@ async def start_pm(client, message: Message, _):
 
         if name == "help":
             out = help_pannel(_)
-            await message.reply_photo(
+            return await message.reply_photo(
                 photo=config.START_IMG_URL,
                 caption=_["help_1"].format(message.from_user.first_name),
                 reply_markup=InlineKeyboardMarkup(out),
             )
-            return
 
         elif name == "sudolist":
             if message.from_user.id not in sudoers_list:
                 return await message.reply_text(_["general_5"])
             from AnonXMusic.utils.sudoers import sudoers_list as s_list
-
             text = _["sudo_1"]
             for count, user_id in enumerate(s_list, 1):
                 text += f"\n{count} ➻ <a href='tg://user?id={user_id}'>{user_id}</a>"
-            await message.reply_text(text)
-            return
+            return await message.reply_text(text)
 
         elif name.startswith("info_"):
             m = await message.reply_text("🔎")
             query = name.replace("info_", "", 1)
-            query_url = f"https://www.youtube.com/watch?v={query}"
-            results = VideosSearch(query_url, limit=1)
+            results = VideosSearch(f"https://www.youtube.com/watch?v={query}", limit=1)
             for result in (await results.next())["result"]:
                 title = result["title"]
                 duration = result["duration"]
@@ -67,15 +74,17 @@ async def start_pm(client, message: Message, _):
                 channel = result["channel"]["name"]
                 link = result["link"]
                 published = result["publishedTime"]
+
             searched_text = _["start_6"].format(
                 title, duration, views, published, channellink, channel, app.mention
             )
+
             key = InlineKeyboardMarkup(
                 [
                     [
                         InlineKeyboardButton(text=_["S_B_8"], url=link),
                         InlineKeyboardButton(text=_["S_B_9"], url=config.SUPPORT_CHAT),
-                    ],
+                    ]
                 ]
             )
             await m.delete()
@@ -85,6 +94,7 @@ async def start_pm(client, message: Message, _):
                 caption=searched_text,
                 reply_markup=key,
             )
+
             if await is_on_off(2):
                 return await app.send_message(
                     chat_id=config.LOGGER_ID,
@@ -92,7 +102,6 @@ async def start_pm(client, message: Message, _):
                 )
             return
 
-    # No command argument — normal start flow
     # Typing animation
     loading_msg = await message.reply_text("❄️")
     await asyncio.sleep(0.75)
@@ -103,10 +112,23 @@ async def start_pm(client, message: Message, _):
     await loading_msg.edit_text("<blockquote>ʏᴏsɪᴋᴀ ɪs ɢᴇᴀʀɪɴɢ ᴜᴘ...</blockquote>")
     await asyncio.sleep(0.22)
 
+    heart_img = random.choice(HEART_IMAGES)
+    heart_markdown = f"[‎]({heart_img})"
+
+    start_text = (
+        "**ʜᴇʟʟᴏ,** {0} " + heart_markdown + "\n"
+        "ʏᴏᴜ’ʀᴇ ɴᴏᴡ ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴛᴏ **{1} 💗**\n"
+        "⟶ ᴀ sʟᴇᴇᴋ ᴍᴜsɪᴄ ʙᴏᴛ ᴄʀᴀғᴛᴇᴅ ғᴏʀ sᴛʀᴇᴀᴍɪɴɢ ᴡɪᴛʜ sᴛʏʟᴇ, sᴘᴇᴇᴅ & ᴘᴏᴡᴇʀ.\n"
+        "**ᴘʟᴀᴛғᴏʀᴍs :** ʏᴏᴜᴛᴜʙᴇ • sᴘᴏᴛɪғʏ • ᴀᴘᴘʟᴇ • sᴏᴜɴᴅᴄʟᴏᴜᴅ • ʀᴇssᴏ\n"
+        "**ᴛᴀᴘ 'ʜᴇʟᴘ' ғᴏʀ ᴄᴏᴍᴍᴀɴᴅs & ᴍᴏᴅᴜʟᴇs.**"
+    ).format(message.from_user.mention, app.mention)
+
     out = private_panel(_)
     await loading_msg.edit_text(
-        text=_["start_2"].format(message.from_user.mention, app.mention),
+        text=start_text,
         reply_markup=InlineKeyboardMarkup(out),
+        disable_web_page_preview=False,
+        parse_mode="markdown"
     )
 
     if await is_on_off(2):
