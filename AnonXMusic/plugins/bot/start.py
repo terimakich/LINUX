@@ -22,11 +22,9 @@ from AnonXMusic.utils.database import (
 from AnonXMusic.utils.decorators.language import LanguageStart
 from AnonXMusic.utils.formatters import get_readable_time
 from AnonXMusic.utils.inline import help_pannel, private_panel, start_panel
+from config import BANNED_USERS
 from strings import get_string
 
-from config import BANNED_USERS
-
-# Heart image markdown replacements
 HEART_IMAGES = [
     "https://files.catbox.moe/r81508.png",
     "https://files.catbox.moe/qxazvt.png",
@@ -34,7 +32,6 @@ HEART_IMAGES = [
     "https://files.catbox.moe/3hexyx.png",
     "https://files.catbox.moe/9pypu3.png",
 ]
-
 
 @app.on_message(filters.command(["start"]) & filters.private & ~BANNED_USERS)
 @LanguageStart
@@ -64,7 +61,8 @@ async def start_pm(client, message: Message, _):
         elif name.startswith("info_"):
             m = await message.reply_text("🔎")
             query = name.replace("info_", "", 1)
-            results = VideosSearch(f"https://www.youtube.com/watch?v={query}", limit=1)
+            query_url = f"https://www.youtube.com/watch?v={query}"
+            results = VideosSearch(query_url, limit=1)
             for result in (await results.next())["result"]:
                 title = result["title"]
                 duration = result["duration"]
@@ -78,13 +76,12 @@ async def start_pm(client, message: Message, _):
             searched_text = _["start_6"].format(
                 title, duration, views, published, channellink, channel, app.mention
             )
-
             key = InlineKeyboardMarkup(
                 [
                     [
                         InlineKeyboardButton(text=_["S_B_8"], url=link),
                         InlineKeyboardButton(text=_["S_B_9"], url=config.SUPPORT_CHAT),
-                    ]
+                    ],
                 ]
             )
             await m.delete()
@@ -94,7 +91,6 @@ async def start_pm(client, message: Message, _):
                 caption=searched_text,
                 reply_markup=key,
             )
-
             if await is_on_off(2):
                 return await app.send_message(
                     chat_id=config.LOGGER_ID,
@@ -102,7 +98,7 @@ async def start_pm(client, message: Message, _):
                 )
             return
 
-    # Typing animation
+    # Typing Animation
     loading_msg = await message.reply_text("❄️")
     await asyncio.sleep(0.75)
     await loading_msg.edit_text("<blockquote>ʏᴏsɪᴋᴀ ɪs ɢᴇᴀʀɪɴɢ ᴜᴘ.</blockquote>")
@@ -113,22 +109,21 @@ async def start_pm(client, message: Message, _):
     await asyncio.sleep(0.22)
 
     heart_img = random.choice(HEART_IMAGES)
-    heart_markdown = f"[‎]({heart_img})"
+    heart_markdown = f"<a href='{heart_img}'>♡︎</a>"
 
     start_text = (
-        "**ʜᴇʟʟᴏ,** {0} " + heart_markdown + "\n"
-        "ʏᴏᴜ’ʀᴇ ɴᴏᴡ ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴛᴏ **{1} 💗**\n"
+        f"**ʜᴇʟʟᴏ,** {message.from_user.mention} {heart_markdown}. \n"
+        f"ʏᴏᴜ’ʀᴇ ɴᴏᴡ ᴄᴏɴɴᴇᴄᴛᴇᴅ ᴛᴏ **{app.mention} 💗**\n"
         "⟶ ᴀ sʟᴇᴇᴋ ᴍᴜsɪᴄ ʙᴏᴛ ᴄʀᴀғᴛᴇᴅ ғᴏʀ sᴛʀᴇᴀᴍɪɴɢ ᴡɪᴛʜ sᴛʏʟᴇ, sᴘᴇᴇᴅ & ᴘᴏᴡᴇʀ.\n"
         "**ᴘʟᴀᴛғᴏʀᴍs :** ʏᴏᴜᴛᴜʙᴇ • sᴘᴏᴛɪғʏ • ᴀᴘᴘʟᴇ • sᴏᴜɴᴅᴄʟᴏᴜᴅ • ʀᴇssᴏ\n"
         "**ᴛᴀᴘ 'ʜᴇʟᴘ' ғᴏʀ ᴄᴏᴍᴍᴀɴᴅs & ᴍᴏᴅᴜʟᴇs.**"
-    ).format(message.from_user.mention, app.mention)
+    )
 
     out = private_panel(_)
     await loading_msg.edit_text(
         text=start_text,
         reply_markup=InlineKeyboardMarkup(out),
-        disable_web_page_preview=False,
-        parse_mode="markdown"
+        disable_web_page_preview=False
     )
 
     if await is_on_off(2):
@@ -193,6 +188,5 @@ async def welcome(client, message: Message):
                 )
                 await add_served_chat(message.chat.id)
                 await message.stop_propagation()
-
         except Exception as ex:
             print(ex)
