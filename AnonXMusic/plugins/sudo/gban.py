@@ -3,11 +3,11 @@ from pyrogram import filters
 from pyrogram.errors import FloodWait, UserAdminInvalid, PeerIdInvalid
 from pyrogram.types import Message
 
-from saptasree import app
-from saptasree.misc import SUDOERS
-from saptasree.utils import get_readable_time
-from saptasree.utils.decorators.language import language
-from saptasree.utils.extraction import extract_user
+from AnonXMusic import app
+from AnonXMusic.misc import SUDOERS
+from AnonXMusic.utils import get_readable_time
+from AnonXMusic.utils.decorators.language import language
+from AnonXMusic.utils.extraction import extract_user
 
 # -------------------- 🔗 MONGO CONFIG --------------------
 from motor.motor_asyncio import AsyncIOMotorClient
