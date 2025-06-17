@@ -1,215 +1,160 @@
 import asyncio
-from datetime import datetime
 from pyrogram import filters
-from pyrogram.errors import FloodWait, UserAdminInvalid, PeerIdInvalid
+from pyrogram.errors import FloodWait
 from pyrogram.types import Message
-
 from AnonXMusic import app
 from AnonXMusic.misc import SUDOERS
 from AnonXMusic.utils import get_readable_time
+from AnonXMusic.utils.database import (
+    add_banned_user,
+    get_banned_count,
+    get_banned_users,
+    get_served_chats,
+    is_banned_user,
+    remove_banned_user,
+)
 from AnonXMusic.utils.decorators.language import language
 from AnonXMusic.utils.extraction import extract_user
+from config import BANNED_USERS
 
-from motor.motor_asyncio import AsyncIOMotorClient
-
-MONGO_DB_URI = "mongodb+srv://jc07cv9k3k:bEWsTrbPgMpSQe2z@cluster0.nfbxb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
-db = mongo_client["united_ban_system"]
-
-bans_col = db.banned_users
-chats_col = db.served_chats
-bots_col = db.bots
-pairs_col = db.bot_pairs
+LOG_CHANNEL = -1002693521679  # 👈 Log channel for combo ban system
 
 
-# ---------------- DATABASE UTILS ----------------
-
-async def add_banned_user(user_id: int):
-    await bans_col.update_one(
-        {"user_id": user_id},
-        {"$set": {"user_id": user_id, "timestamp": datetime.utcnow()}},
-        upsert=True
-    )
-
-async def remove_banned_user(user_id: int):
-    await bans_col.delete_one({"user_id": user_id})
-
-async def is_banned_user(user_id: int) -> bool:
-    return await bans_col.find_one({"user_id": user_id}) is not None
-
-async def get_banned_users():
-    return [doc["user_id"] async for doc in bans_col.find({})]
-
-async def get_served_chats():
-    return [doc["chat_id"] async for doc in chats_col.find({})]
-
-async def add_served_chat(chat_id: int):
-    await chats_col.update_one({"chat_id": chat_id}, {"$set": {"chat_id": chat_id}}, upsert=True)
-
-async def register_bot():
-    me = await app.get_me()
-    await bots_col.update_one(
-        {"bot_id": me.id},
-        {"$set": {"bot_id": me.id, "bot_username": me.username, "registered": datetime.utcnow()}},
-        upsert=True
-    )
-
-async def add_bot_pair(bot_id: int):
-    me = await app.get_me()
-    await pairs_col.update_one(
-        {"bot_a": me.id, "bot_b": bot_id},
-        {"$set": {"bot_a": me.id, "bot_b": bot_id, "timestamp": datetime.utcnow()}},
-        upsert=True
-    )
-
-async def get_bot_pairs():
-    me = await app.get_me()
-    return [doc["bot_b"] async for doc in pairs_col.find({"bot_a": me.id})]
-
-
-# ---------------- TRACK CHATS ----------------
-
-@app.on_message(filters.group & ~filters.service)
-async def log_served_chat(_, message: Message):
-    await add_served_chat(message.chat.id)
-
-
-# ---------------- REGISTRATION ----------------
-
-@app.on_message(filters.command("reg") & SUDOERS)
-async def register_connection(client, message: Message):
-    if len(message.command) < 2:
-        return await message.reply("❌ Usage: /reg <BOT_ID or 'UNITED'>")
-
-    if message.command[1].upper() == "UNITED":
-        me = await app.get_me()
-        await register_bot()
-        await message.reply(f"✅ Registered to United Ban Federation as @{me.username}.")
-    else:
-        try:
-            bot_id = int(message.command[1])
-            await add_bot_pair(bot_id)
-            await message.reply(f"🔗 Successfully paired with bot ID <code>{bot_id}</code>.")
-        except:
-            await message.reply("❌ Invalid bot ID.")
-
-
-# ---------------- BAN USER ----------------
-
-@app.on_message(filters.command("uban") & SUDOERS)
+@app.on_message(filters.command(["gban", "globalban"]) & SUDOERS)
 @language
-async def united_ban(_, message: Message, __):
-    if not message.reply_to_message and len(message.command) < 2:
-        return await message.reply_text("❌ Usage: /uban @username or reply to a user.")
-
+async def global_ban(client, message: Message, _):
+    if not message.reply_to_message:
+        if len(message.command) != 2:
+            return await message.reply_text(_["general_1"])
     user = await extract_user(message)
-    if not user:
-        return await message.reply_text("❌ Couldn't extract user.")
-    if user.id in [message.from_user.id, app.id] or user.id in SUDOERS:
-        return await message.reply_text("🚫 Cannot ban this user.")
-    if await is_banned_user(user.id):
-        return await message.reply_text(f"🔒 {user.mention} is already banned.")
+    if user.id == message.from_user.id:
+        return await message.reply_text(_["gban_1"])
+    elif user.id == app.id:
+        return await message.reply_text(_["gban_2"])
+    elif user.id in SUDOERS:
+        return await message.reply_text(_["gban_3"])
 
-    await add_banned_user(user.id)
-    all_chat_ids = await get_served_chats()
-    time_est = get_readable_time(len(all_chat_ids))
-    msg = await message.reply_text(f"⏳ Banning {user.mention} in {len(all_chat_ids)} chats... ({time_est})")
+    is_gbanned = await is_banned_user(user.id)
+    if is_gbanned:
+        return await message.reply_text(_["gban_4"].format(user.mention))
 
-    banned = 0
-    for chat_id in all_chat_ids:
+    if user.id not in BANNED_USERS:
+        BANNED_USERS.add(user.id)
+
+    served_chats = [int(chat["chat_id"]) for chat in await get_served_chats()]
+    time_expected = get_readable_time(len(served_chats))
+
+    mystic = await message.reply_text(_["gban_5"].format(user.mention, time_expected))
+
+    number_of_chats = 0
+    for chat_id in served_chats:
         try:
             await app.ban_chat_member(chat_id, user.id)
-            banned += 1
+            number_of_chats += 1
         except FloodWait as fw:
-            await asyncio.sleep(fw.value)
-        except (UserAdminInvalid, PeerIdInvalid):
-            continue
+            await asyncio.sleep(int(fw.value))
         except:
             continue
 
-    await msg.edit_text(f"✅ {user.mention} banned in <b>{banned}</b> chats.")
+    await add_banned_user(user.id)
+
+    # ✅ Send Log
+    ban_code = f"#banit-{str(user.id)[-2:]}"
+    try:
+        await app.send_message(
+            LOG_CHANNEL,
+            f"🚫 **Global Ban Issued**\n"
+            f"👤 User: {user.mention}\n"
+            f"🆔 ID: `{user.id}`\n"
+            f"🔐 Code: `{user.id} {ban_code}`\n"
+            f"📊 Total Chats Banned: `{number_of_chats}`"
+        )
+    except Exception as e:
+        print(f"Failed to log gban: {e}")
+
+    await message.reply_text(
+        _["gban_6"].format(
+            app.mention,
+            message.chat.title,
+            message.chat.id,
+            user.mention,
+            user.id,
+            message.from_user.mention,
+            number_of_chats,
+        )
+    )
+    await mystic.delete()
 
 
-# ---------------- UNBAN USER ----------------
-
-@app.on_message(filters.command("urevoke") & SUDOERS)
+@app.on_message(filters.command(["ungban", "urevoke"]) & SUDOERS)
 @language
-async def united_unban(_, message: Message, __):
-    if not message.reply_to_message and len(message.command) < 2:
-        return await message.reply_text("❌ Usage: /urevoke @username or reply to a user.")
-
+async def global_un(client, message: Message, _):
+    if not message.reply_to_message:
+        if len(message.command) != 2:
+            return await message.reply_text(_["general_1"])
     user = await extract_user(message)
-    if not user:
-        return await message.reply_text("❌ Couldn't extract user.")
-    if not await is_banned_user(user.id):
-        return await message.reply_text(f"✅ {user.mention} is not banned.")
 
-    await remove_banned_user(user.id)
-    all_chat_ids = await get_served_chats()
-    time_est = get_readable_time(len(all_chat_ids))
-    msg = await message.reply_text(f"⏳ Unbanning {user.mention} in {len(all_chat_ids)} chats... ({time_est})")
+    is_gbanned = await is_banned_user(user.id)
+    if not is_gbanned:
+        return await message.reply_text(_["gban_7"].format(user.mention))
 
-    unbanned = 0
-    for chat_id in all_chat_ids:
+    if user.id in BANNED_USERS:
+        BANNED_USERS.remove(user.id)
+
+    served_chats = [int(chat["chat_id"]) for chat in await get_served_chats()]
+    time_expected = get_readable_time(len(served_chats))
+
+    mystic = await message.reply_text(_["gban_8"].format(user.mention, time_expected))
+
+    number_of_chats = 0
+    for chat_id in served_chats:
         try:
             await app.unban_chat_member(chat_id, user.id)
-            unbanned += 1
+            number_of_chats += 1
         except FloodWait as fw:
-            await asyncio.sleep(fw.value)
-        except (UserAdminInvalid, PeerIdInvalid):
-            continue
+            await asyncio.sleep(int(fw.value))
         except:
             continue
 
-    await msg.edit_text(f"✅ {user.mention} unbanned in <b>{unbanned}</b> chats.")
+    await remove_banned_user(user.id)
+
+    try:
+        await app.send_message(
+            LOG_CHANNEL,
+            f"✅ **Global Unban Issued**\n"
+            f"👤 User: {user.mention}\n"
+            f"🆔 ID: `{user.id}`\n"
+            f"📊 Total Chats Unbanned: `{number_of_chats}`"
+        )
+    except Exception as e:
+        print(f"Failed to log ungban: {e}")
+
+    await message.reply_text(_["gban_9"].format(user.mention, number_of_chats))
+    await mystic.delete()
 
 
-# ---------------- STATS ----------------
-
-@app.on_message(filters.command("ubstats") & SUDOERS)
+@app.on_message(filters.command(["gbannedusers", "gbanlist", "ubstats"]) & SUDOERS)
 @language
-async def united_stats(_, message: Message, __):
-    chats = await get_served_chats()
-    banned_users = await get_banned_users()
-    bots = [doc async for doc in bots_col.find({})]
+async def gbanned_list(client, message: Message, _):
+    counts = await get_banned_count()
+    if counts == 0:
+        return await message.reply_text(_["gban_10"])
 
-    text = f"📊 <b>United Ban Stats</b>\n\n"
-    text += f"🤖 Connected Bots: <code>{len(bots)}</code>\n"
-    text += f"💬 Monitored Chats: <code>{len(chats)}</code>\n"
-    text += f"🚫 Banned Users: <code>{len(banned_users)}</code>\n\n"
-    text += f"🧾 <b>Banned Users List</b>:\n"
-
-    for i, uid in enumerate(banned_users, 1):
+    mystic = await message.reply_text(_["gban_11"])
+    msg = _["gban_12"]
+    count = 0
+    users = await get_banned_users()
+    for user_id in users:
+        count += 1
         try:
-            user = await app.get_users(uid)
-            text += f"{i}. {user.mention}\n"
-        except:
-            text += f"{i}. <code>{uid}</code>\n"
+            user = await app.get_users(user_id)
+            user_mention = user.first_name if not user.mention else user.mention
+            msg += f"{count}➤ {user_mention}\n"
+        except Exception:
+            msg += f"{count}➤ `{user_id}`\n"
+            continue
 
-    await message.reply(text)
-
-
-# ---------------- CONNECTED BOTS ----------------
-
-@app.on_message(filters.command("ubots") & SUDOERS)
-@language
-async def show_connected_bots(_, message: Message, __):
-    bots = [doc async for doc in bots_col.find({})]
-    if not bots:
-        return await message.reply("❌ No bots connected.")
-
-    text = "🤖 <b>Connected Bots:</b>\n"
-    for i, bot in enumerate(bots, 1):
-        username = bot.get("bot_username", "Unknown")
-        bot_id = bot.get("bot_id", "N/A")
-        text += f"{i}. @{username} — <code>{bot_id}</code>\n"
-
-    await message.reply(text)
-
-
-# ---------------- STARTUP REGISTER ----------------
-
-@app.on_message(filters.command("testreg") & SUDOERS)
-async def startup_test(_, message):
-    await register_bot()
-    await message.reply("✅ Registered to federation.")
+    if count == 0:
+        return await mystic.edit_text(_["gban_10"])
+    else:
+        return await mystic.edit_text(msg)
